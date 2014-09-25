@@ -1,3 +1,4 @@
+// Package golimit limits http requests storing requests in redis.
 package golimit
 
 import (
@@ -12,17 +13,28 @@ import (
 	"github.com/hoisie/redis"
 )
 
+// A Limit defines the necessary values to limit a request.
 type Limit struct {
-	Method   string
-	Path     string
+	// Method specifies what type of http method you want to rate limit.
+	Method string
+	// Path Specifies the path (r.RequestURI) of the which http requests to limit.
+	Path string
+	// Requests specifies how many requests are allowed before limiting begins.
 	Requests int64
+	// Duration specifies the rate limit window in seconds.
 	Duration int64
 }
 
+// Limits holds a slice of Limit to allow multiple limited routes.
 type Limits []Limit
 
+// A Limiter is returned by NewLimiter.
 type Limiter struct {
-	Header    string
+	// Header specifies the ip proxy header to look for to limit requests.
+	// For example Heroku uses X-FORWARDED-FOR. To look for the remote address
+	// rather than a proxy header use an empty string.
+	Header string
+	// LimitsMap contains a map using method+path to speed up lookups.
 	LimitsMap limitsMap
 }
 
@@ -45,7 +57,7 @@ func ipAddrFromRemoteAddr(s string) string {
 func getAddress(r *http.Request, header string) (string, error) {
 	var headerVal string
 
-	if header == "REMOTE_ADDR" {
+	if header == "" {
 		headerVal = r.RemoteAddr
 	} else {
 		headerVal = r.Header.Get(header)
@@ -109,6 +121,9 @@ func setHeaders(rw http.ResponseWriter, limit Limit, count int64, timeout int64)
 	}
 }
 
+// Creates a new rate limiter. If you already have a redis connection available
+// via github.com/hoisie/redis you can pass it as the last parameter. Passing nil
+// will create a new redis connection (The enviroment variable "REDIS_URL" must be set).
 func NewLimiter(limits *Limits, header string, c *redis.Client) *Limiter {
 	lMap := make(limitsMap)
 
@@ -126,6 +141,15 @@ func NewLimiter(limits *Limits, header string, c *redis.Client) *Limiter {
 	return &Limiter{header, lMap}
 }
 
+// Handler takes and returns a http.Handler. Best used as a middleware chain.
+// Eg.
+//
+// mux := http.NewServeMux()
+// mux.HandleFunc("/", ...)
+//
+// limiter := golimit.NewLimiter(...)
+// http.ListenAndServe(":80", limiter.Handle(mux))
+//
 func (l Limiter) Handle(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		lMap := l.LimitsMap
