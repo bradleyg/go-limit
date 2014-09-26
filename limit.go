@@ -2,14 +2,13 @@
 package golimit
 
 import (
-	"errors"
 	"log"
 	"net/http"
 	"net/url"
 	"os"
 	"strconv"
-	"strings"
 
+	"github.com/bradleyg/go-address"
 	"github.com/hoisie/redis"
 )
 
@@ -32,8 +31,8 @@ type Limits []Limit
 type Limiter struct {
 	// Header specifies the ip proxy header to look for to limit requests.
 	// For example Heroku uses X-FORWARDED-FOR. To look for the remote address
-	// rather than a proxy header use an empty string.
-	Header string
+	// rather than a proxy header use "nil".
+	Header interface{}
 	// LimitsMap contains a map using method+path to speed up lookups.
 	LimitsMap limitsMap
 }
@@ -45,45 +44,6 @@ var (
 	logErr  = log.New(os.Stderr, "[go-limit:error] ", 0)
 	logInfo = log.New(os.Stdout, "[go-limit:info] ", 0)
 )
-
-func ipAddrFromRemoteAddr(s string) string {
-	idx := strings.LastIndex(s, ":")
-	if idx == -1 {
-		return s
-	}
-	return s[:idx]
-}
-
-func getAddress(r *http.Request, header string) (string, error) {
-	var headerVal string
-
-	if header == "" {
-		headerVal = r.RemoteAddr
-	} else {
-		headerVal = r.Header.Get(header)
-	}
-
-	addresses := strings.Split(headerVal, ",")
-	address := strings.TrimSpace(addresses[0])
-	address = ipAddrFromRemoteAddr(address)
-
-	if address == "" {
-		err := errors.New("Could not read address")
-		return "", err
-	}
-
-	return address, nil
-}
-
-func expire(count int64, key string, duration int64) error {
-	if count == 1 {
-		_, err := client.Expire(key, duration)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
 
 func redisConn() *redis.Client {
 	redisURL := os.Getenv("REDIS_URL")
@@ -121,10 +81,25 @@ func setHeaders(rw http.ResponseWriter, limit Limit, count int64, timeout int64)
 	}
 }
 
-// Creates a new rate limiter. If you already have a redis connection available
-// via github.com/hoisie/redis you can pass it as the last parameter. Passing nil
-// will create a new redis connection (The enviroment variable "REDIS_URL" must be set).
-func NewLimiter(limits *Limits, header string, c *redis.Client) *Limiter {
+// Creates a new rate limiter.
+//
+// By passing "nil" as the "header" argument you are asking to read the IP from r.RemoteAddr.
+//
+//  limiter := NewLimiter(limits, nil, nil)
+//
+// You can also pass a string rather than nil to specify to look at a header rather than the remote
+// address. This is useful for when serving requests behind a proxy. For example
+// Heroku passes through the remote IP in the header "X-Forwarded-For".
+//
+//  limiter := NewLimiter(limits, "X-Forwarded-For", nil)
+//
+// If you already have a redis connection available via github.com/hoisie/redis
+// you can pass it as the last parameter. Passing nil will create a new redis
+// connection (The enviroment variable "REDIS_URL" must be set).
+//
+//  limiter := NewLimiter(limits, "X-Forwarded-For", &client)
+//
+func NewLimiter(limits *Limits, header interface{}, c *redis.Client) *Limiter {
 	lMap := make(limitsMap)
 
 	if c == nil {
@@ -142,13 +117,12 @@ func NewLimiter(limits *Limits, header string, c *redis.Client) *Limiter {
 }
 
 // Handler takes and returns a http.Handler. Best used as a middleware chain.
-// Eg.
 //
-// mux := http.NewServeMux()
-// mux.HandleFunc("/", ...)
+//   mux := http.NewServeMux()
+//   mux.HandleFunc("/", ...)
 //
-// limiter := golimit.NewLimiter(...)
-// http.ListenAndServe(":80", limiter.Handle(mux))
+//   limiter := golimit.NewLimiter(...)
+//   http.ListenAndServe(":80", limiter.Handle(mux))
 //
 func (l Limiter) Handle(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
@@ -160,7 +134,7 @@ func (l Limiter) Handle(handler http.Handler) http.Handler {
 			return
 		}
 
-		address, err := getAddress(r, l.Header)
+		address, err := goaddress.Get(r, l.Header)
 		if err != nil {
 			logErr.Println(err)
 			rw.WriteHeader(http.StatusBadRequest)
@@ -176,10 +150,13 @@ func (l Limiter) Handle(handler http.Handler) http.Handler {
 			return
 		}
 
-		if err = expire(count, key, limit.Duration); err != nil {
-			logErr.Println(err)
-			rw.WriteHeader(http.StatusInternalServerError)
-			return
+		if count == 1 {
+			_, err := client.Expire(key, limit.Duration)
+			if err != nil {
+				logErr.Println(err)
+				rw.WriteHeader(http.StatusInternalServerError)
+				return
+			}
 		}
 
 		if count > limit.Requests {

@@ -43,7 +43,7 @@ func init() {
 		},
 	}
 
-	limiter = NewLimiter(limits, "", nil)
+	limiter = NewLimiter(limits, nil, nil)
 
 	r, err := http.NewRequest("GET", "/test", nil)
 	if err != nil {
@@ -155,51 +155,5 @@ func TestRateLimitExpire(t *testing.T) {
 		if i == limit {
 			time.Sleep(1 * time.Second)
 		}
-	}
-}
-
-func TestGetAddressWithPort(t *testing.T) {
-	req.RemoteAddr = "0.0.0.0:80"
-
-	address, err := getAddress(req, "")
-	if err != nil {
-		t.Fatalf("%s", err.Error())
-	}
-
-	if address != "0.0.0.0" {
-		t.Fatalf("Address doesn't match. Expected %s, Actual %s", "0.0.0.0", address)
-	}
-}
-
-func TestGetAddressWithoutPort(t *testing.T) {
-	req.RemoteAddr = "0.0.0.0"
-
-	address, err := getAddress(req, "")
-	if err != nil {
-		t.Fatalf("%s", err.Error())
-	}
-
-	if address != "0.0.0.0" {
-		t.Fatalf("Address doesn't match. Expected %s, Actual %s", "0.0.0.0", address)
-	}
-}
-
-func TestGetAddressWithHeader(t *testing.T) {
-	req.Header.Set("HTTP_X_FORWARDED_FOR", "1.1.1.1:80, 2.2.2.2:80")
-
-	address, err := getAddress(req, "HTTP_X_FORWARDED_FOR")
-	if err != nil {
-		t.Fatalf("%s", err.Error())
-	}
-
-	if address != "1.1.1.1" {
-		t.Fatalf("Address doesn't match. Expected %s, Actual %s", "1.1.1.1", address)
-	}
-}
-
-func TestGetAddressWithNoAddress(t *testing.T) {
-	_, err := getAddress(req, "MISSING_ADDRESS")
-	if err == nil {
-		t.Fatalf("A missing address should return an error")
 	}
 }
