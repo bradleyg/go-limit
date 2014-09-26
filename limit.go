@@ -17,7 +17,7 @@ import (
 type Limit struct {
 	// Method specifies what type of http method you want to rate limit.
 	Method string
-	// Path Specifies the path (r.RequestURI) of the which http requests to limit.
+	// Path Specifies the path (r.URL.Path) of the which http requests to limit.
 	Path string
 	// Requests specifies how many requests are allowed before limiting begins.
 	Requests int64
@@ -62,6 +62,9 @@ func getAddress(r *http.Request, header string) (string, error) {
 	} else {
 		headerVal = r.Header.Get(header)
 	}
+
+	log.Println("-----")
+	log.Println(header)
 
 	addresses := strings.Split(headerVal, ",")
 	address := strings.TrimSpace(addresses[0])
@@ -154,7 +157,7 @@ func (l Limiter) Handle(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		lMap := l.LimitsMap
 
-		limit, ok := lMap[r.Method+":"+r.RequestURI]
+		limit, ok := lMap[r.Method+":"+r.URL.Path]
 		if !ok {
 			handler.ServeHTTP(rw, r)
 			return
@@ -163,10 +166,11 @@ func (l Limiter) Handle(handler http.Handler) http.Handler {
 		address, err := getAddress(r, l.Header)
 		if err != nil {
 			logErr.Println(err)
-			rw.WriteHeader(http.StatusInternalServerError)
+			rw.WriteHeader(http.StatusBadRequest)
+			return
 		}
 
-		key := "go-ratelimit:(" + address + ")" + r.Method + r.RequestURI
+		key := "go-ratelimit:(" + address + ")" + r.Method + r.URL.Path
 
 		count, err := client.Incr(key)
 		if err != nil {
