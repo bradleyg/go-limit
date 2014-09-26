@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"net/url"
 	"os"
 	"strconv"
 
 	"github.com/bradleyg/go-address"
+	"github.com/bradleyg/go-redisify"
 	"github.com/hoisie/redis"
 )
 
@@ -45,28 +45,6 @@ var (
 	logErr  = log.New(os.Stderr, "[go-limit:error] ", 0)
 	logInfo = log.New(os.Stdout, "[go-limit:info] ", 0)
 )
-
-func redisConn() *redis.Client {
-	redisURL := os.Getenv("REDIS_URL")
-
-	parsed, err := url.Parse(redisURL)
-	if err != nil {
-		logErr.Panic(err)
-	}
-
-	c := redis.Client{
-		Addr: parsed.Host,
-	}
-
-	if parsed.User != nil {
-		password, ok := parsed.User.Password()
-		if ok {
-			c.Password = password
-		}
-	}
-
-	return &c
-}
 
 func setHeaders(rw http.ResponseWriter, limit Limit, count int64, timeout int64) {
 	remaining := limit.Requests - count
@@ -105,7 +83,11 @@ func NewLimiter(limits *Limits, header interface{}, c *redis.Client) *Limiter {
 	lMap := make(limitsMap)
 
 	if c == nil {
-		client = redisConn()
+		var err error
+		client, err = goredisify.Conn(os.Getenv("REDIS_URL"))
+		if err != nil {
+			log.Fatal(err)
+		}
 	} else {
 		client = c
 	}

@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"testing"
 	"time"
+
+	"github.com/bradleyg/go-redisify"
 )
 
 var (
@@ -17,7 +19,10 @@ var (
 )
 
 func init() {
-	client = redisConn()
+	client, err := goredisify.Conn(nil)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	keys, err := client.Keys("go-ratelimit:*")
 	if err != nil {
