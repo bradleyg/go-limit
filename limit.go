@@ -63,9 +63,6 @@ func getAddress(r *http.Request, header string) (string, error) {
 		headerVal = r.Header.Get(header)
 	}
 
-	log.Println("-----")
-	log.Println(header)
-
 	addresses := strings.Split(headerVal, ",")
 	address := strings.TrimSpace(addresses[0])
 	address = ipAddrFromRemoteAddr(address)
