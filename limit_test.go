@@ -102,25 +102,25 @@ func TestRateLimit(t *testing.T) {
 				t.Fatalf("Incorrect status code when limiting. Expected %d, Actual %d", 429, res.StatusCode)
 			}
 
-			if string(body) != "" {
-				t.Fatal("Body should be empty when rate limiting. Expected %s, Actual %s", "", string(body))
+			if string(body) != "429, Too Many Requests" {
+				t.Fatalf("Body should be empty when rate limiting. Expected %s, Actual %s", "429, Too Many Requests", string(body))
 			}
 
 			retryAfter, err := strconv.ParseInt(res.Header.Get("Retry-After"), 10, 64)
 			if err != nil {
-				t.Fatal("Could not parse int from Retry-After", err)
+				t.Fatalf("Could not parse int from Retry-After", err)
 			}
 
 			if retryAfter != duration {
-				t.Fatal("Remaining count incorrect. Expected %d, Actual %d", duration, retryAfter)
+				t.Fatalf("Remaining count incorrect. Expected %d, Actual %d", duration, retryAfter)
 			}
 		} else {
 			if res.StatusCode != http.StatusOK {
-				t.Fatal("Incorrect status code returned when not limiting. Expected %d, Actual %d", http.StatusOK, res.StatusCode)
+				t.Fatalf("Incorrect status code returned when not limiting. Expected %d, Actual %d", http.StatusOK, res.StatusCode)
 			}
 
 			if string(body) != "ok" {
-				t.Fatal("Incorrect body when not limiting. Expect %s, Actual %s", "ok", string(body))
+				t.Fatalf("Incorrect body when not limiting. Expect %s, Actual %s", "ok", string(body))
 			}
 		}
 

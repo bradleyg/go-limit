@@ -2,6 +2,7 @@
 package golimit
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"net/url"
@@ -95,7 +96,8 @@ func setHeaders(rw http.ResponseWriter, limit Limit, count int64, timeout int64)
 //
 // If you already have a redis connection available via github.com/hoisie/redis
 // you can pass it as the last parameter. Passing nil will create a new redis
-// connection (The enviroment variable "REDIS_URL" must be set).
+// connection. The default connection will user localhost but the enviroment
+// variable "REDIS_URL" can also be set and used.
 //
 //  limiter := NewLimiter(limits, "X-Forwarded-For", &client)
 //
@@ -171,6 +173,7 @@ func (l Limiter) Handle(handler http.Handler) http.Handler {
 
 			setHeaders(rw, limit, count, timeout)
 			rw.WriteHeader(429)
+			fmt.Fprintf(rw, "429, Too Many Requests")
 			return
 		}
 
