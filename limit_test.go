@@ -43,7 +43,7 @@ func init() {
 		},
 	}
 
-	limiter = NewLimiter(limits, "REMOTE_ADDR", nil)
+	limiter = NewLimiter(limits, "", nil)
 
 	r, err := http.NewRequest("GET", "/test", nil)
 	if err != nil {
@@ -161,7 +161,7 @@ func TestRateLimitExpire(t *testing.T) {
 func TestGetAddressWithPort(t *testing.T) {
 	req.RemoteAddr = "0.0.0.0:80"
 
-	address, err := getAddress(req, "REMOTE_ADDR")
+	address, err := getAddress(req, "")
 	if err != nil {
 		t.Fatalf("%s", err.Error())
 	}
@@ -174,7 +174,7 @@ func TestGetAddressWithPort(t *testing.T) {
 func TestGetAddressWithoutPort(t *testing.T) {
 	req.RemoteAddr = "0.0.0.0"
 
-	address, err := getAddress(req, "REMOTE_ADDR")
+	address, err := getAddress(req, "")
 	if err != nil {
 		t.Fatalf("%s", err.Error())
 	}
