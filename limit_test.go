@@ -48,7 +48,7 @@ func init() {
 		},
 	}
 
-	limiter = NewLimiter(limits, nil, nil)
+	limiter = New(limits, nil, nil)
 
 	r, err := http.NewRequest("GET", "/test", nil)
 	if err != nil {
